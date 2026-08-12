@@ -1,0 +1,2450 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Windows на JavaScript</title>
+    <style>
+        /* ----- Глобальный сброс и фон ----- */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
+            background: #0a0e1a;
+        }
+
+        /* ----- ЭКРАН ЗАГРУЗКИ (BOOT SCREEN) ----- */
+        #bootScreen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: #0a0e1a;
+            z-index: 999999;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            transition: opacity 1s ease, transform 1s ease;
+        }
+
+        #bootScreen.hidden {
+            opacity: 0;
+            transform: scale(1.1);
+            pointer-events: none;
+        }
+
+        .boot-logo {
+            font-size: 72px;
+            margin-bottom: 20px;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%,
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+            50% {
+                transform: scale(1.08);
+                opacity: 0.7;
+            }
+        }
+
+        .boot-title {
+            font-size: 42px;
+            font-weight: 300;
+            color: #ecf5ff;
+            letter-spacing: 4px;
+            text-shadow: 0 0 40px rgba(60, 140, 255, 0.15);
+        }
+
+        .boot-subtitle {
+            font-size: 16px;
+            color: #6a8aaa;
+            margin-top: 8px;
+            letter-spacing: 2px;
+            font-weight: 300;
+        }
+
+        .boot-progress-container {
+            margin-top: 40px;
+            width: 380px;
+            max-width: 80vw;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 30px;
+            height: 6px;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        .boot-progress-bar {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #2a6a8a, #6ab0ff);
+            border-radius: 30px;
+            transition: width 0.3s ease;
+        }
+
+        .boot-status {
+            color: #6a8aaa;
+            font-size: 14px;
+            margin-top: 16px;
+            font-family: 'Courier New', monospace;
+            letter-spacing: 0.5px;
+        }
+
+        .boot-status .highlight {
+            color: #ffd966;
+        }
+
+        .boot-dots {
+            display: inline-block;
+            width: 20px;
+            text-align: left;
+        }
+
+        /* ----- ЭКРАН БЛОКИРОВКИ ----- */
+        #lockScreen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: radial-gradient(ellipse at 50% 40%, #2a3f6a, #0a0e1a);
+            z-index: 99999;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            transition: opacity 0.8s ease, transform 0.8s ease;
+            opacity: 0;
+            transform: scale(0.95);
+            pointer-events: none;
+        }
+
+        #lockScreen.visible {
+            opacity: 1;
+            transform: scale(1);
+            pointer-events: auto;
+        }
+
+        .lock-time {
+            font-size: 82px;
+            font-weight: 300;
+            color: #ecf5ff;
+            text-shadow: 0 4px 30px rgba(0, 0, 0, 0.6);
+            letter-spacing: 2px;
+        }
+
+        .lock-date {
+            font-size: 24px;
+            color: #b0ccf0;
+            margin-top: 8px;
+            font-weight: 300;
+            text-shadow: 0 2px 20px rgba(0, 0, 0, 0.4);
+        }
+
+        .lock-user {
+            margin-top: 40px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .lock-avatar {
+            font-size: 72px;
+            filter: drop-shadow(0 8px 30px rgba(0, 0, 0, 0.5));
+        }
+
+        .lock-username {
+            font-size: 22px;
+            color: #dce7fc;
+            font-weight: 400;
+        }
+
+        .lock-input-container {
+            margin-top: 30px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 16px;
+            width: 320px;
+        }
+
+        .lock-password-input {
+            background: rgba(255, 255, 255, 0.06);
+            border: 2px solid rgba(255, 255, 255, 0.15);
+            border-radius: 40px;
+            padding: 14px 24px;
+            width: 100%;
+            font-size: 18px;
+            color: #ecf5ff;
+            outline: none;
+            transition: 0.3s;
+            text-align: center;
+            letter-spacing: 6px;
+            font-weight: 500;
+        }
+
+        .lock-password-input:focus {
+            border-color: #6a9ed0;
+            background: rgba(255, 255, 255, 0.08);
+            box-shadow: 0 0 30px rgba(60, 140, 255, 0.15);
+        }
+
+        .lock-password-input::placeholder {
+            color: rgba(255, 255, 255, 0.25);
+            letter-spacing: 1px;
+            font-weight: 300;
+        }
+
+        .lock-error {
+            color: #ff6b6b;
+            font-size: 14px;
+            min-height: 24px;
+            font-weight: 400;
+            opacity: 0;
+            transition: 0.3s;
+        }
+
+        .lock-error.show {
+            opacity: 1;
+        }
+
+        .lock-btn {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 40px;
+            padding: 12px 48px;
+            color: #ecf5ff;
+            font-size: 17px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: 0.25s;
+            width: 100%;
+        }
+
+        .lock-btn:hover {
+            background: rgba(60, 140, 255, 0.2);
+            border-color: #6a9ed0;
+            transform: scale(1.02);
+        }
+
+        .lock-btn:active {
+            transform: scale(0.96);
+        }
+
+        .lock-hint {
+            color: rgba(255, 255, 255, 0.2);
+            font-size: 13px;
+            margin-top: 4px;
+        }
+
+        /* ----- РАБОЧИЙ СТОЛ ----- */
+        #desktop {
+            width: 100vw;
+            height: 100vh;
+            background: radial-gradient(ellipse at 30% 20%, #2a3f5e, #0e1422);
+            position: relative;
+            overflow: hidden;
+            opacity: 0;
+            transition: opacity 1s ease;
+        }
+
+        #desktop.visible {
+            opacity: 1;
+        }
+
+        /* ----- ИКОНКИ РАБОЧЕГО СТОЛА ----- */
+        .desktop-icon {
+            position: absolute;
+            width: 80px;
+            height: 90px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: #ecf5ff;
+            text-shadow: 0 2px 12px rgba(0, 0, 0, 0.9);
+            cursor: pointer;
+            border-radius: 12px;
+            padding: 6px 4px;
+            transition: 0.12s;
+            background: rgba(0, 0, 0, 0.1);
+            border: 1px solid transparent;
+            text-align: center;
+            gap: 4px;
+        }
+
+        .desktop-icon:hover {
+            background: rgba(255, 255, 255, 0.07);
+            border-color: rgba(255, 255, 255, 0.12);
+            transform: scale(1.04);
+        }
+
+        .desktop-icon .icon-emoji {
+            font-size: 44px;
+            line-height: 1.2;
+            filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.6));
+        }
+
+        .desktop-icon .icon-label {
+            font-size: 13px;
+            font-weight: 500;
+            background: rgba(0, 0, 0, 0.45);
+            padding: 2px 12px;
+            border-radius: 30px;
+            backdrop-filter: blur(6px);
+            max-width: 90px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        /* ----- ПАНЕЛЬ ЗАДАЧ (TASKBAR) ----- */
+        #taskbar {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 56px;
+            background: rgba(16, 24, 40, 0.88);
+            backdrop-filter: blur(16px);
+            display: flex;
+            align-items: center;
+            padding: 0 16px;
+            gap: 12px;
+            border-top: 1px solid #3e5270;
+            box-shadow: 0 -6px 30px rgba(0, 0, 0, 0.6);
+            z-index: 1000;
+        }
+
+        #start-btn {
+            background: #2a3d5e;
+            border: none;
+            color: #ecf4ff;
+            font-weight: 600;
+            font-size: 17px;
+            padding: 6px 20px;
+            border-radius: 30px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: 0.2s;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+            letter-spacing: 0.3px;
+        }
+
+        #start-btn:hover {
+            background: #3e5a7c;
+            transform: scale(1.02);
+        }
+
+        #start-btn:active {
+            transform: scale(0.95);
+        }
+
+        #task-list {
+            display: flex;
+            flex: 1;
+            gap: 6px;
+            overflow-x: auto;
+            padding: 4px 0;
+            align-items: center;
+        }
+
+        .task-item {
+            background: rgba(60, 85, 120, 0.35);
+            backdrop-filter: blur(4px);
+            padding: 4px 16px;
+            border-radius: 20px;
+            color: #d3e2ff;
+            font-size: 14px;
+            cursor: pointer;
+            white-space: nowrap;
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            transition: 0.15s;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .task-item:hover {
+            background: rgba(80, 120, 180, 0.45);
+            border-color: #6a8fc0;
+        }
+
+        .task-item.active {
+            background: #3e6a9e;
+            border-color: #8bb8ff;
+            color: white;
+            box-shadow: 0 0 16px #3f7ec0;
+        }
+
+        #clock {
+            color: #cddfff;
+            font-size: 15px;
+            font-weight: 500;
+            background: rgba(0, 0, 0, 0.25);
+            padding: 6px 18px;
+            border-radius: 30px;
+            backdrop-filter: blur(4px);
+            border: 1px solid #3a5070;
+            white-space: nowrap;
+        }
+
+        /* ----- МЕНЮ ПУСК ----- */
+        #start-menu {
+            position: absolute;
+            bottom: 70px;
+            left: 16px;
+            background: rgba(14, 22, 40, 0.94);
+            backdrop-filter: blur(30px);
+            border: 1px solid #4f6a8a;
+            border-radius: 24px;
+            padding: 18px 20px;
+            width: 290px;
+            color: #dce7fc;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.9);
+            z-index: 2000;
+            display: none;
+            transition: 0.2s;
+        }
+
+        #start-menu.visible {
+            display: block;
+        }
+
+        #start-menu h3 {
+            font-weight: 400;
+            border-bottom: 1px solid #3a5070;
+            padding-bottom: 12px;
+            margin-bottom: 14px;
+            color: #b6d0f5;
+            letter-spacing: 0.5px;
+            font-size: 18px;
+        }
+
+        .start-app-item {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 10px 14px;
+            border-radius: 18px;
+            cursor: pointer;
+            transition: 0.12s;
+            margin-bottom: 2px;
+        }
+
+        .start-app-item:hover {
+            background: rgba(70, 110, 170, 0.3);
+            backdrop-filter: blur(8px);
+        }
+
+        .start-app-item .emoji {
+            font-size: 28px;
+        }
+
+        .start-app-item span:last-child {
+            font-size: 16px;
+        }
+
+        .start-divider {
+            border: none;
+            border-top: 1px solid #3a5070;
+            margin: 12px 0;
+        }
+
+        /* ----- ОКНА ----- */
+        .window {
+            position: absolute;
+            background: rgba(22, 32, 50, 0.94);
+            backdrop-filter: blur(20px);
+            border: 1px solid #48638a;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
+            min-width: 300px;
+            min-height: 180px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            resize: both;
+            animation: fadeIn 0.2s ease;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: scale(0.94) translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+            }
+        }
+
+        .window-header {
+            background: rgba(8, 16, 30, 0.7);
+            padding: 10px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: grab;
+            border-bottom: 1px solid #3a5070;
+            backdrop-filter: blur(8px);
+        }
+
+        .window-header:active {
+            cursor: grabbing;
+        }
+
+        .window-title {
+            color: #eaf3ff;
+            font-weight: 600;
+            font-size: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .window-controls {
+            display: flex;
+            gap: 8px;
+        }
+
+        .window-controls button {
+            background: transparent;
+            border: none;
+            color: #b0caf0;
+            font-size: 18px;
+            cursor: pointer;
+            width: 28px;
+            height: 28px;
+            border-radius: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: 0.15s;
+        }
+
+        .window-controls button:hover {
+            background: rgba(255, 255, 255, 0.08);
+            color: white;
+        }
+
+        .window-controls .btn-close:hover {
+            background: #c42b3a;
+            color: white;
+        }
+
+        .window-body {
+            flex: 1;
+            padding: 18px 22px;
+            color: #dce7fc;
+            overflow: auto;
+            font-size: 15px;
+            line-height: 1.6;
+            background: rgba(0, 0, 0, 0.12);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .window-body p {
+            margin-bottom: 10px;
+        }
+
+        .window-body button {
+            background: #2d4b70;
+            border: none;
+            color: white;
+            padding: 8px 22px;
+            border-radius: 30px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: 0.15s;
+            border: 1px solid #4d74a0;
+        }
+
+        .window-body button:hover {
+            background: #3f6a96;
+            transform: scale(1.02);
+        }
+
+        .window-body button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .window-body textarea {
+            width: 100%;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid #3a5270;
+            border-radius: 10px;
+            color: #e8f0ff;
+            padding: 12px;
+            font-size: 14px;
+            resize: vertical;
+            font-family: 'Courier New', monospace;
+            outline: none;
+            min-height: 120px;
+        }
+
+        .window-body textarea:focus {
+            border-color: #6a9ed0;
+            box-shadow: 0 0 20px #2f5580;
+        }
+
+        .resize-handle {
+            position: absolute;
+            bottom: 4px;
+            right: 4px;
+            width: 16px;
+            height: 16px;
+            cursor: nwse-resize;
+            border-bottom: 3px solid #6480aa;
+            border-right: 3px solid #6480aa;
+            border-radius: 0 0 8px 0;
+            opacity: 0.4;
+        }
+
+        /* ----- СТИЛИ ДЛЯ БРАУЗЕРА ----- */
+        .browser-toolbar {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            background: rgba(0, 0, 0, 0.2);
+            padding: 10px 12px;
+            border-radius: 10px;
+            border: 1px solid #2a4060;
+            margin-bottom: 10px;
+            flex-shrink: 0;
+        }
+
+        .browser-nav {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        .browser-nav button {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid #2a4060;
+            color: #b0caf0;
+            padding: 4px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: 0.15s;
+            min-width: 32px;
+        }
+
+        .browser-nav button:hover {
+            background: rgba(255, 255, 255, 0.12);
+            border-color: #4a6a8a;
+        }
+
+        .browser-nav button:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        .browser-url {
+            flex: 1;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid #2a4060;
+            border-radius: 20px;
+            padding: 6px 16px;
+            color: #ecf5ff;
+            font-size: 14px;
+            outline: none;
+            min-width: 120px;
+        }
+
+        .browser-url:focus {
+            border-color: #6a9ed0;
+            box-shadow: 0 0 20px rgba(60, 140, 255, 0.1);
+        }
+
+        .browser-url::placeholder {
+            color: rgba(255, 255, 255, 0.25);
+        }
+
+        .browser-content {
+            flex: 1;
+            background: rgba(0, 0, 0, 0.15);
+            border-radius: 10px;
+            border: 1px solid #2a4060;
+            overflow: hidden;
+            min-height: 200px;
+            position: relative;
+        }
+
+        .browser-content iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+            background: white;
+        }
+
+        .browser-content .iframe-placeholder {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: #8aaac0;
+            padding: 40px;
+            text-align: center;
+        }
+
+        .browser-content .iframe-placeholder .big-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+
+        .browser-content .iframe-placeholder .title {
+            font-size: 20px;
+            color: #ecf5ff;
+            margin-bottom: 8px;
+        }
+
+        .browser-content .iframe-placeholder .subtitle {
+            font-size: 14px;
+            color: #6a8aaa;
+        }
+
+        .browser-status {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            color: #6a8aaa;
+            padding: 4px 4px 0 4px;
+            font-family: 'Courier New', monospace;
+            flex-shrink: 0;
+        }
+
+        .browser-status .loading-text {
+            color: #ffd966;
+        }
+
+        .browser-status .success-text {
+            color: #6a8a6a;
+        }
+
+        .browser-status .error-text {
+            color: #ff6b6b;
+        }
+
+        .browser-tabs {
+            display: flex;
+            gap: 4px;
+            padding: 4px 0;
+            overflow-x: auto;
+            flex-shrink: 0;
+        }
+
+        .browser-tab {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid #2a4060;
+            border-radius: 8px 8px 0 0;
+            padding: 4px 14px;
+            font-size: 13px;
+            color: #8aaac0;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            white-space: nowrap;
+            transition: 0.15s;
+            border-bottom: none;
+        }
+
+        .browser-tab.active {
+            background: rgba(255, 255, 255, 0.1);
+            color: #ecf5ff;
+            border-color: #4a6a8a;
+        }
+
+        .browser-tab:hover {
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .browser-tab .tab-close {
+            cursor: pointer;
+            opacity: 0.5;
+            transition: 0.15s;
+            font-size: 14px;
+        }
+
+        .browser-tab .tab-close:hover {
+            opacity: 1;
+            color: #ff6b6b;
+        }
+
+        .browser-tab .tab-favicon {
+            font-size: 14px;
+        }
+
+        .browser-tab .tab-loading {
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* ----- СТИЛИ ДЛЯ РЕДАКТОРА РЕЕСТРА ----- */
+        .reg-tree {
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            color: #b0d0ff;
+            background: rgba(0, 0, 0, 0.25);
+            padding: 12px;
+            border-radius: 10px;
+            min-height: 150px;
+            border: 1px solid #3a5270;
+        }
+
+        .reg-tree .folder {
+            color: #ffd966;
+        }
+
+        .reg-tree .key {
+            color: #7fc9ff;
+        }
+
+        .reg-tree .value {
+            color: #a8e6a8;
+        }
+
+        .reg-tree .indent {
+            padding-left: 24px;
+        }
+
+        /* ----- ТАБЛИЦА ДЛЯ ДИСПЕТЧЕРА ----- */
+        .taskmgr-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+            color: #dce7fc;
+        }
+
+        .taskmgr-table th {
+            text-align: left;
+            padding: 8px 10px;
+            border-bottom: 2px solid #3a5270;
+            color: #b0caf0;
+            font-weight: 500;
+        }
+
+        .taskmgr-table td {
+            padding: 6px 10px;
+            border-bottom: 1px solid #2a4060;
+        }
+
+        .taskmgr-table .cpu-bar {
+            display: inline-block;
+            height: 8px;
+            border-radius: 10px;
+            background: #3e6a9e;
+            transition: 0.3s;
+        }
+
+        /* ----- СТИЛИ ДЛЯ МОЕГО КОМПЬЮТЕРА ----- */
+        .drive-container {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 12px;
+            padding: 14px 16px;
+            margin-bottom: 12px;
+            border: 1px solid #2a4060;
+        }
+
+        .drive-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 6px;
+        }
+
+        .drive-name {
+            font-weight: 600;
+            color: #b0d0ff;
+        }
+
+        .drive-size {
+            font-size: 13px;
+            color: #8aaac0;
+        }
+
+        .drive-bar {
+            width: 100%;
+            height: 20px;
+            background: #0a1422;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid #2a4060;
+            position: relative;
+        }
+
+        .drive-bar-fill {
+            height: 100%;
+            border-radius: 12px;
+            transition: width 0.8s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: 600;
+            color: white;
+            text-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+        }
+
+        .drive-bar-fill.scanning {
+            background: repeating-linear-gradient(90deg,
+                    #2a6a8a,
+                    #2a6a8a 10px,
+                    #3a8aaa 10px,
+                    #3a8aaa 20px);
+            animation: scan 0.8s linear infinite;
+        }
+
+        @keyframes scan {
+            0% {
+                background-position: 0 0;
+            }
+            100% {
+                background-position: 40px 0;
+            }
+        }
+
+        .scan-status {
+            margin-top: 6px;
+            font-size: 13px;
+            color: #8aaac0;
+            font-family: 'Courier New', monospace;
+        }
+
+        .scan-status .highlight {
+            color: #ffd966;
+        }
+
+        .drive-details {
+            margin-top: 8px;
+            font-size: 13px;
+            color: #8aaac0;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 4px 16px;
+        }
+
+        .drive-details span {
+            display: flex;
+            gap: 6px;
+        }
+
+        .drive-details .label {
+            color: #6a8aaa;
+        }
+
+        .drive-details .value {
+            color: #b0d0ff;
+        }
+
+        .system-info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 4px 20px;
+            background: rgba(0, 0, 0, 0.15);
+            padding: 12px 16px;
+            border-radius: 10px;
+            margin-bottom: 12px;
+        }
+
+        .system-info-grid .label {
+            color: #6a8aaa;
+        }
+
+        .system-info-grid .value {
+            color: #b0d0ff;
+            font-weight: 500;
+        }
+
+        /* ----- КНОПКА БЛОКИРОВКИ В ПАНЕЛИ ----- */
+        #lock-btn {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            color: #b0caf0;
+            padding: 4px 14px;
+            border-radius: 30px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: 0.2s;
+            margin-left: 4px;
+        }
+
+        #lock-btn:hover {
+            background: rgba(255, 255, 255, 0.12);
+            border-color: #6a8fc0;
+        }
+
+        /* ----- АДАПТИВ ----- */
+        @media (max-width: 700px) {
+            .window {
+                min-width: 240px;
+            }
+            #start-menu {
+                width: 230px;
+                left: 8px;
+                bottom: 64px;
+                padding: 14px 16px;
+            }
+            #start-btn {
+                font-size: 14px;
+                padding: 4px 14px;
+            }
+            #clock {
+                font-size: 13px;
+                padding: 4px 12px;
+            }
+            .lock-time {
+                font-size: 52px;
+            }
+            .lock-date {
+                font-size: 18px;
+            }
+            .lock-input-container {
+                width: 260px;
+            }
+            .drive-details {
+                grid-template-columns: 1fr;
+            }
+            .system-info-grid {
+                grid-template-columns: 1fr;
+            }
+            .boot-title {
+                font-size: 28px;
+            }
+            .boot-progress-container {
+                width: 280px;
+            }
+            .browser-nav {
+                flex-wrap: wrap;
+            }
+            .browser-url {
+                min-width: 80px;
+                font-size: 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ЭКРАН ЗАГРУЗКИ -->
+    <div id="bootScreen">
+        <div class="boot-logo">🪟</div>
+        <div class="boot-title">Windows JS</div>
+        <div class="boot-subtitle">Веб-операционная система</div>
+        <div class="boot-progress-container">
+            <div class="boot-progress-bar" id="bootProgress"></div>
+        </div>
+        <div class="boot-status" id="bootStatus">
+            <span class="highlight">▶</span> Загрузка системы...
+            <span class="boot-dots" id="bootDots"></span>
+        </div>
+    </div>
+
+    <!-- ЭКРАН БЛОКИРОВКИ -->
+    <div id="lockScreen">
+        <div class="lock-time" id="lockTime">--:--</div>
+        <div class="lock-date" id="lockDate">--</div>
+        <div class="lock-user">
+            <div class="lock-avatar">👤</div>
+            <div class="lock-username">Пользователь</div>
+        </div>
+        <div class="lock-input-container">
+            <input type="password" class="lock-password-input" id="lockPassword" placeholder="Введите пароль" maxlength="10" autofocus />
+            <div class="lock-error" id="lockError">✕ Неверный пароль</div>
+            <button class="lock-btn" id="lockSubmit">Войти</button>
+            <div class="lock-hint">Пароль: 1234</div>
+        </div>
+    </div>
+
+    <!-- РАБОЧИЙ СТОЛ -->
+    <div id="desktop">
+
+        <!-- Иконки -->
+        <div class="desktop-icon" style="top: 30px; left: 30px;" data-app="notepad">
+            <span class="icon-emoji">📝</span>
+            <span class="icon-label">Блокнот</span>
+        </div>
+        <div class="desktop-icon" style="top: 140px; left: 30px;" data-app="about">
+            <span class="icon-emoji">ℹ️</span>
+            <span class="icon-label">О системе</span>
+        </div>
+        <div class="desktop-icon" style="top: 250px; left: 30px;" data-app="explorer">
+            <span class="icon-emoji">📁</span>
+            <span class="icon-label">Проводник</span>
+        </div>
+        <div class="desktop-icon" style="top: 360px; left: 30px;" data-app="terminal">
+            <span class="icon-emoji">⌨️</span>
+            <span class="icon-label">Терминал</span>
+        </div>
+        <div class="desktop-icon" style="top: 470px; left: 30px;" data-app="taskmgr">
+            <span class="icon-emoji">📊</span>
+            <span class="icon-label">Диспетчер задач</span>
+        </div>
+        <div class="desktop-icon" style="top: 30px; left: 140px;" data-app="mycomputer">
+            <span class="icon-emoji">🖥️</span>
+            <span class="icon-label">Мой компьютер</span>
+        </div>
+        <div class="desktop-icon" style="top: 140px; left: 140px;" data-app="regedit">
+            <span class="icon-emoji">📋</span>
+            <span class="icon-label">Редактор реестра</span>
+        </div>
+        <div class="desktop-icon" style="top: 250px; left: 140px;" data-app="browser">
+            <span class="icon-emoji">🌐</span>
+            <span class="icon-label">Браузер</span>
+        </div>
+
+        <!-- ПАНЕЛЬ ЗАДАЧ -->
+        <div id="taskbar">
+            <button id="start-btn">🪟 Пуск</button>
+            <div id="task-list"></div>
+            <button id="lock-btn" title="Заблокировать">🔒</button>
+            <div id="clock">--:--</div>
+        </div>
+
+        <!-- МЕНЮ ПУСК -->
+        <div id="start-menu">
+            <h3>📌 Приложения</h3>
+            <div class="start-app-item" data-app="notepad">
+                <span class="emoji">📝</span><span>Блокнот</span>
+            </div>
+            <div class="start-app-item" data-app="about">
+                <span class="emoji">ℹ️</span><span>О системе</span>
+            </div>
+            <div class="start-app-item" data-app="explorer">
+                <span class="emoji">📁</span><span>Проводник</span>
+            </div>
+            <div class="start-app-item" data-app="terminal">
+                <span class="emoji">⌨️</span><span>Терминал</span>
+            </div>
+            <div class="start-app-item" data-app="taskmgr">
+                <span class="emoji">📊</span><span>Диспетчер задач</span>
+            </div>
+            <div class="start-app-item" data-app="mycomputer">
+                <span class="emoji">🖥️</span><span>Мой компьютер</span>
+            </div>
+            <div class="start-app-item" data-app="regedit">
+                <span class="emoji">📋</span><span>Редактор реестра</span>
+            </div>
+            <div class="start-app-item" data-app="browser">
+                <span class="emoji">🌐</span><span>Браузер</span>
+            </div>
+            <hr class="start-divider" />
+            <div class="start-app-item" id="shutdown-item">
+                <span class="emoji">⏻</span><span>Выключить</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (function() {
+            'use strict';
+
+            // ----- СОСТОЯНИЕ -----
+            const state = {
+                windows: [],
+                nextId: 1,
+                activeWindowId: null,
+                startMenuOpen: false,
+                isLocked: true,
+                bootComplete: false,
+                browserHistory: {},
+            };
+
+            // DOM
+            const desktop = document.getElementById('desktop');
+            const taskList = document.getElementById('task-list');
+            const startBtn = document.getElementById('start-btn');
+            const startMenu = document.getElementById('start-menu');
+            const clockEl = document.getElementById('clock');
+
+            // Boot screen
+            const bootScreen = document.getElementById('bootScreen');
+            const bootProgress = document.getElementById('bootProgress');
+            const bootStatus = document.getElementById('bootStatus');
+            const bootDots = document.getElementById('bootDots');
+
+            // Lock screen
+            const lockScreen = document.getElementById('lockScreen');
+            const lockTime = document.getElementById('lockTime');
+            const lockDate = document.getElementById('lockDate');
+            const lockPassword = document.getElementById('lockPassword');
+            const lockError = document.getElementById('lockError');
+            const lockSubmit = document.getElementById('lockSubmit');
+            const lockBtn = document.getElementById('lock-btn');
+
+            // ----- ЧАСЫ -----
+            function updateClock() {
+                const d = new Date();
+                const time = d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+                clockEl.textContent = time;
+                if (lockTime) lockTime.textContent = time;
+                if (lockDate) {
+                    const options = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' };
+                    lockDate.textContent = d.toLocaleDateString('ru-RU', options);
+                }
+            }
+            updateClock();
+            setInterval(updateClock, 10000);
+
+            // ----- ЭКРАН ЗАГРУЗКИ -----
+            function bootSystem() {
+                let progress = 0;
+                const statusMessages = [
+                    'Загрузка ядра системы...',
+                    'Инициализация модулей...',
+                    'Подключение служб...',
+                    'Загрузка драйверов...',
+                    'Проверка оборудования...',
+                    'Настройка окружения...',
+                    'Загрузка пользовательского интерфейса...',
+                    'Подготовка рабочего стола...',
+                    'Система готова к работе!'
+                ];
+
+                let msgIndex = 0;
+                let dotCount = 0;
+
+                const bootInterval = setInterval(() => {
+                    progress += 1 + Math.floor(Math.random() * 4);
+
+                    if (progress >= 100) {
+                        progress = 100;
+                        clearInterval(bootInterval);
+                        bootProgress.style.width = '100%';
+                        bootStatus.innerHTML = '<span class="highlight">✅</span> Загрузка завершена!';
+
+                        setTimeout(() => {
+                            bootScreen.classList.add('hidden');
+                            desktop.classList.add('visible');
+
+                            setTimeout(() => {
+                                lockScreen.classList.add('visible');
+                                state.isLocked = true;
+                                lockPassword.focus();
+
+                                setTimeout(() => {
+                                    launchApp('about');
+                                    setTimeout(() => launchApp('mycomputer'), 400);
+                                    setTimeout(() => launchApp('browser'), 800);
+                                }, 200);
+
+                            }, 400);
+
+                        }, 600);
+
+                        return;
+                    }
+
+                    bootProgress.style.width = progress + '%';
+
+                    if (progress > 10 && msgIndex < statusMessages.length - 1) {
+                        const threshold = Math.floor(10 + (90 / (statusMessages.length - 1)) * msgIndex);
+                        if (progress >= threshold && msgIndex < statusMessages.length - 1) {
+                            msgIndex++;
+                            bootStatus.innerHTML =
+                                `<span class="highlight">▶</span> ${statusMessages[msgIndex]} <span class="boot-dots" id="bootDots"></span>`;
+                        }
+                    }
+
+                    dotCount = (dotCount + 1) % 4;
+                    const dots = '.'.repeat(dotCount) + ' '.repeat(3 - dotCount);
+                    const dotsEl = document.getElementById('bootDots');
+                    if (dotsEl) dotsEl.textContent = dots;
+
+                }, 150);
+            }
+
+            setTimeout(bootSystem, 300);
+
+            // ----- ЭКРАН БЛОКИРОВКИ -----
+            function lockSystem() {
+                if (!state.bootComplete) return;
+                state.isLocked = true;
+                lockScreen.classList.add('visible');
+                lockPassword.value = '';
+                lockError.classList.remove('show');
+                lockPassword.focus();
+                state.windows.forEach(w => {
+                    w.element.style.display = 'none';
+                });
+                updateTaskbar();
+            }
+
+            function unlockSystem() {
+                state.isLocked = false;
+                lockScreen.classList.remove('visible');
+                state.windows.forEach(w => {
+                    w.element.style.display = 'flex';
+                });
+                if (state.activeWindowId) {
+                    const win = state.windows.find(w => w.id === state.activeWindowId);
+                    if (win) setActiveWindow(state.activeWindowId);
+                } else if (state.windows.length > 0) {
+                    setActiveWindow(state.windows[state.windows.length - 1].id);
+                }
+                updateTaskbar();
+            }
+
+            function checkPassword() {
+                const pass = lockPassword.value;
+                if (pass === '1234') {
+                    unlockSystem();
+                } else {
+                    lockError.classList.add('show');
+                    lockPassword.value = '';
+                    lockPassword.focus();
+                    setTimeout(() => {
+                        lockError.classList.remove('show');
+                    }, 2000);
+                }
+            }
+
+            lockPassword.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    checkPassword();
+                }
+            });
+
+            lockSubmit.addEventListener('click', checkPassword);
+
+            lockBtn.addEventListener('click', () => {
+                if (!state.isLocked && state.bootComplete) {
+                    lockSystem();
+                }
+            });
+
+            // ----- ВСПОМОГАТЕЛЬНЫЕ -----
+            function getNextId() { return state.nextId++; }
+
+            // ----- ОБНОВЛЕНИЕ ПАНЕЛИ ЗАДАЧ -----
+            function updateTaskbar() {
+                taskList.innerHTML = '';
+                state.windows.forEach(w => {
+                    const el = w.element;
+                    if (el.style.display === 'none') return;
+                    const btn = document.createElement('div');
+                    btn.className = 'task-item';
+                    if (state.activeWindowId === w.id && !state.isLocked) btn.classList.add('active');
+                    btn.textContent = w.title;
+                    btn.addEventListener('click', () => {
+                        if (state.isLocked) return;
+                        if (el.style.display === 'none') el.style.display = 'flex';
+                        setActiveWindow(w.id);
+                        el.style.zIndex = 100 + state.windows.length;
+                    });
+                    taskList.appendChild(btn);
+                });
+            }
+
+            // ----- АКТИВАЦИЯ ОКНА -----
+            function setActiveWindow(id) {
+                if (state.isLocked) return;
+                state.activeWindowId = id;
+                state.windows.forEach(w => {
+                    const el = w.element;
+                    if (w.id === id) {
+                        el.style.zIndex = 100 + state.windows.length;
+                        el.style.borderColor = '#7aa9e6';
+                        el.style.boxShadow = '0 20px 60px rgba(0,0,0,0.8), 0 0 30px rgba(60,140,255,0.15)';
+                    } else {
+                        el.style.borderColor = '#48638a';
+                        el.style.boxShadow = '0 12px 40px rgba(0,0,0,0.5)';
+                    }
+                });
+                updateTaskbar();
+            }
+
+            // ----- ЗАКРЫТИЕ ОКНА -----
+            function closeWindow(id) {
+                const idx = state.windows.findIndex(w => w.id === id);
+                if (idx === -1) return;
+                const winData = state.windows[idx];
+                winData.element.remove();
+                state.windows.splice(idx, 1);
+                if (state.activeWindowId === id) {
+                    state.activeWindowId = null;
+                    const visible = state.windows.find(w => w.element.style.display !== 'none');
+                    if (visible) setActiveWindow(visible.id);
+                }
+                updateTaskbar();
+            }
+
+            // ----- СОЗДАНИЕ ОКНА -----
+            function createWindow(app, title, contentHTML, width = 420, height = 280) {
+                const id = getNextId();
+                const win = document.createElement('div');
+                win.className = 'window';
+                win.dataset.windowId = id;
+
+                const offset = state.windows.length * 24;
+                win.style.left = (60 + offset) + 'px';
+                win.style.top = (40 + offset) + 'px';
+                win.style.width = width + 'px';
+                win.style.height = height + 'px';
+
+                const header = document.createElement('div');
+                header.className = 'window-header';
+                header.innerHTML = `
+                    <span class="window-title">${title}</span>
+                    <div class="window-controls">
+                        <button class="btn-minimize" title="Свернуть">─</button>
+                        <button class="btn-close" title="Закрыть">✕</button>
+                    </div>
+                `;
+
+                const body = document.createElement('div');
+                body.className = 'window-body';
+                body.innerHTML = contentHTML;
+
+                win.appendChild(header);
+                win.appendChild(body);
+
+                const resizeHandle = document.createElement('div');
+                resizeHandle.className = 'resize-handle';
+                win.appendChild(resizeHandle);
+
+                desktop.appendChild(win);
+
+                const winData = {
+                    id,
+                    app,
+                    title,
+                    element: win,
+                    content: body,
+                    width,
+                    height,
+                    x: parseInt(win.style.left),
+                    y: parseInt(win.style.top),
+                };
+                state.windows.push(winData);
+
+                if (!state.isLocked) {
+                    setActiveWindow(id);
+                } else {
+                    win.style.display = 'none';
+                }
+
+                // ----- СОБЫТИЯ -----
+                header.querySelector('.btn-close').addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    closeWindow(id);
+                });
+
+                header.querySelector('.btn-minimize').addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    win.style.display = 'none';
+                    updateTaskbar();
+                    if (state.activeWindowId === id) {
+                        state.activeWindowId = null;
+                        const visible = state.windows.find(w => w.element.style.display !== 'none');
+                        if (visible) setActiveWindow(visible.id);
+                    }
+                });
+
+                let drag = false,
+                    startX, startY, origX, origY;
+                header.addEventListener('mousedown', (e) => {
+                    if (state.isLocked) return;
+                    if (e.target.closest('.window-controls')) return;
+                    drag = true;
+                    const rect = win.getBoundingClientRect();
+                    startX = e.clientX;
+                    startY = e.clientY;
+                    origX = rect.left;
+                    origY = rect.top;
+                    win.style.cursor = 'grabbing';
+                    setActiveWindow(id);
+                    e.preventDefault();
+                });
+
+                window.addEventListener('mousemove', (e) => {
+                    if (!drag) return;
+                    const dx = e.clientX - startX;
+                    const dy = e.clientY - startY;
+                    win.style.left = (origX + dx) + 'px';
+                    win.style.top = (origY + dy) + 'px';
+                    const data = state.windows.find(w => w.id === id);
+                    if (data) { data.x = origX + dx;
+                        data.y = origY + dy; }
+                });
+
+                window.addEventListener('mouseup', () => {
+                    if (drag) { drag = false;
+                        win.style.cursor = 'default'; }
+                });
+
+                let resize = false,
+                    rStartX, rStartY, rOrigW, rOrigH;
+                resizeHandle.addEventListener('mousedown', (e) => {
+                    if (state.isLocked) return;
+                    e.stopPropagation();
+                    resize = true;
+                    rStartX = e.clientX;
+                    rStartY = e.clientY;
+                    rOrigW = win.offsetWidth;
+                    rOrigH = win.offsetHeight;
+                    e.preventDefault();
+                });
+
+                window.addEventListener('mousemove', (e) => {
+                    if (!resize) return;
+                    const dw = e.clientX - rStartX;
+                    const dh = e.clientY - rStartY;
+                    win.style.width = Math.max(260, rOrigW + dw) + 'px';
+                    win.style.height = Math.max(150, rOrigH + dh) + 'px';
+                });
+
+                window.addEventListener('mouseup', () => { resize = false; });
+
+                win.addEventListener('mousedown', () => {
+                    if (!state.isLocked) setActiveWindow(id);
+                });
+
+                updateTaskbar();
+                return winData;
+            }
+
+            // ----- ГЕНЕРАТОР СЛУЧАЙНЫХ ДАННЫХ ДЛЯ ДИСПЕТЧЕРА -----
+            function generateProcesses() {
+                const names = ['System', 'svchost.exe', 'explorer.exe', 'chrome.exe', 'firefox.exe', 'notepad.exe',
+                    'cmd.exe', 'taskmgr.exe', 'winlogon.exe', 'services.exe', 'lsass.exe', 'spoolsv.exe',
+                    'SearchIndexer.exe', 'RuntimeBroker.exe', 'ShellExperienceHost.exe', 'browser.exe'
+                ];
+                const processes = [];
+                const count = 8 + Math.floor(Math.random() * 12);
+                const used = new Set();
+                for (let i = 0; i < Math.min(count, names.length); i++) {
+                    let name;
+                    do {
+                        name = names[Math.floor(Math.random() * names.length)];
+                    } while (used.has(name));
+                    used.add(name);
+                    const cpu = Math.floor(Math.random() * 60) + 1;
+                    const memory = Math.floor(Math.random() * 500) + 20;
+                    processes.push({ name, cpu, memory, pid: 1000 + Math.floor(Math.random() * 9000) });
+                }
+                return processes;
+            }
+
+            // ----- РЕАЛИСТИЧНЫЙ МОЙ КОМПЬЮТЕР СО СКАНИРОВАНИЕМ ДИСКА -----
+            function createMyComputerContent() {
+                const totalDisk = 512;
+                const usedDisk = 187 + Math.floor(Math.random() * 40);
+                const freeDisk = totalDisk - usedDisk;
+                const diskPercent = Math.round((usedDisk / totalDisk) * 100);
+
+                const fileTypes = ['.txt', '.docx', '.pdf', '.jpg', '.png', '.mp3', '.mp4', '.exe', '.zip', '.js', '.html',
+                    '.css'
+                ];
+                const fileNames = ['report', 'document', 'photo', 'music', 'video', 'archive', 'setup', 'notes', 'project',
+                    'backup', 'config', 'data', 'image', 'presentation'
+                ];
+                let fileList = '';
+                for (let i = 0; i < 12 + Math.floor(Math.random() * 15); i++) {
+                    const name = fileNames[Math.floor(Math.random() * fileNames.length)];
+                    const ext = fileTypes[Math.floor(Math.random() * fileTypes.length)];
+                    const size = (Math.random() * 15 + 0.5).toFixed(1);
+                    fileList += `📄 ${name}${ext} (${size} MB)\n`;
+                }
+
+                return `
+                    <div style="margin-bottom:12px;">
+                        <div class="system-info-grid">
+                            <span><span class="label">💻 Система:</span> <span class="value">Windows JS 3.0</span></span>
+                            <span><span class="label">⚙️ Процессор:</span> <span class="value">JS Engine v8</span></span>
+                            <span><span class="label">🧠 Память:</span> <span class="value">${(2.4 + Math.random() * 1.2).toFixed(1)} GB</span></span>
+                            <span><span class="label">🖥️ Разрядность:</span> <span class="value">64-bit</span></span>
+                            <span><span class="label">🌐 Сеть:</span> <span class="value">Ethernet (подключено)</span></span>
+                            <span><span class="label">🖨️ Принтер:</span> <span class="value">Не установлен</span></span>
+                        </div>
+                    </div>
+
+                    <div class="drive-container">
+                        <div class="drive-header">
+                            <span class="drive-name">📀 Локальный диск (C:)</span>
+                            <span class="drive-size">${usedDisk} GB / ${totalDisk} GB</span>
+                        </div>
+                        <div class="drive-bar">
+                            <div class="drive-bar-fill" id="driveBarFill" style="width:${diskPercent}%; background:${diskPercent > 80 ? '#c42b3a' : '#3e8a5e'};">
+                                ${diskPercent}%
+                            </div>
+                        </div>
+                        <div class="scan-status" id="scanStatus">
+                            <span class="highlight">🟢</span> Готово · Файлов: <span id="fileCount">${12 + Math.floor(Math.random() * 15)}</span>
+                        </div>
+                        <div class="drive-details">
+                            <span><span class="label">📂 Занято:</span> <span class="value">${usedDisk} GB</span></span>
+                            <span><span class="label">📂 Свободно:</span> <span class="value">${freeDisk} GB</span></span>
+                            <span><span class="label">📁 Файловая система:</span> <span class="value">NTFS</span></span>
+                            <span><span class="label">📅 Дата сканирования:</span> <span class="value">${new Date().toLocaleDateString()}</span></span>
+                        </div>
+                    </div>
+
+                    <div style="display:flex; gap:10px; margin-top:6px; flex-wrap:wrap;">
+                        <button id="scanDriveBtn">🔍 Сканировать диск</button>
+                        <button id="analyzeBtn">📊 Анализ диска</button>
+                        <button id="refreshDrivesBtn">🔄 Обновить</button>
+                    </div>
+
+                    <div id="scanLog" style="margin-top:12px; background:rgba(0,0,0,0.2); border-radius:8px; padding:10px 14px; font-family:'Courier New', monospace; font-size:13px; max-height:120px; overflow-y:auto; color:#8aaac0; border:1px solid #2a4060; display:none;">
+                        <div style="color:#ffd966;">▶ Инициализация сканирования...</div>
+                    </div>
+
+                    <div id="fileList" style="margin-top:10px; background:rgba(0,0,0,0.15); border-radius:8px; padding:10px 14px; font-family:'Courier New', monospace; font-size:12px; max-height:100px; overflow-y:auto; color:#8aaac0; border:1px solid #2a4060; display:none; white-space:pre-wrap;">
+                        ${fileList}
+                    </div>
+
+                    <p style="margin-top:12px; font-size:13px; opacity:0.5;">🔄 Данные обновлены (${new Date().toLocaleTimeString()})</p>
+                `;
+            }
+
+            // ----- РЕАЛИСТИЧНЫЙ БРАУЗЕР С IFrame -----
+            function createBrowserContent() {
+                // Инициализация истории браузера
+                if (!state.browserHistory.tabs) {
+                    state.browserHistory.tabs = [{
+                        id: 1,
+                        title: 'Новая вкладка',
+                        url: '',
+                        history: [''],
+                        historyIndex: 0,
+                        favicon: '🌐',
+                        isLoading: false,
+                    }];
+                    state.browserHistory.nextTabId = 2;
+                    state.browserHistory.activeTabId = 1;
+                }
+
+                let tabsHTML = '';
+                state.browserHistory.tabs.forEach(tab => {
+                    const isActive = tab.id === state.browserHistory.activeTabId;
+                    const loadingClass = tab.isLoading ? 'tab-loading' : '';
+                    tabsHTML += `
+                        <div class="browser-tab ${isActive ? 'active' : ''}" data-tab-id="${tab.id}">
+                            <span class="tab-favicon ${loadingClass}">${tab.isLoading ? '⟳' : (tab.favicon || '🌐')}</span>
+                            <span>${tab.title || 'Новая вкладка'}</span>
+                            <span class="tab-close" data-tab-id="${tab.id}">✕</span>
+                        </div>
+                    `;
+                });
+
+                const activeTab = state.browserHistory.tabs.find(t => t.id === state.browserHistory.activeTabId);
+                const currentUrl = activeTab ? activeTab.url : '';
+
+                return `
+                    <div class="browser-toolbar">
+                        <div class="browser-tabs">
+                            ${tabsHTML}
+                            <button id="newTabBtn" style="background:rgba(255,255,255,0.05); border:1px solid #2a4060; color:#b0caf0; border-radius:8px; padding:2px 12px; cursor:pointer; font-size:16px;">+</button>
+                        </div>
+                        <div class="browser-nav">
+                            <button id="backBtn" title="Назад">◀</button>
+                            <button id="forwardBtn" title="Вперёд">▶</button>
+                            <button id="refreshBtn" title="Обновить">⟳</button>
+                            <button id="homeBtn" title="Домой">🏠</button>
+                            <input type="text" class="browser-url" id="browserUrl" placeholder="Введите URL (например, https://example.com)..." value="${currentUrl}" />
+                            <button id="goBtn">Перейти</button>
+                        </div>
+                        <div class="browser-status">
+                            <span id="browserStatus">Готово</span>
+                            <span id="browserTime">${new Date().toLocaleTimeString()}</span>
+                        </div>
+                    </div>
+                    <div class="browser-content" id="browserContent">
+                        ${renderIframe(currentUrl)}
+                    </div>
+                `;
+            }
+
+            function renderIframe(url) {
+                if (!url || url === '' || url === 'about:blank') {
+                    return `
+                        <div class="iframe-placeholder">
+                            <div class="big-icon">🌐</div>
+                            <div class="title">Добро пожаловать в браузер</div>
+                            <div class="subtitle">Введите адрес сайта в строку выше</div>
+                            <div style="margin-top:20px; color:#4a6a8a; font-size:13px;">
+                                Например: https://example.com
+                            </div>
+                        </div>
+                    `;
+                }
+
+                // Проверяем, что URL имеет протокол
+                let finalUrl = url;
+                if (!finalUrl.startsWith('http://') && !finalUrl.startsWith('https://') && !finalUrl.startsWith('file://')) {
+                    finalUrl = 'https://' + finalUrl;
+                }
+
+                // Для некоторых сайтов, которые блокируют iframe, показываем сообщение
+                const blockedSites = ['youtube.com', 'youtu.be', 'google.com', 'facebook.com', 'twitter.com', 'instagram.com',
+                    'tiktok.com'
+                ];
+                const isBlocked = blockedSites.some(site => finalUrl.includes(site));
+
+                if (isBlocked) {
+                    return `
+                        <div class="iframe-placeholder" style="justify-content:center; padding:40px;">
+                            <div class="big-icon">🔒</div>
+                            <div class="title">Сайт не отображается в iframe</div>
+                            <div class="subtitle">Некоторые сайты (YouTube, Google, соцсети) блокируют загрузку в iframe</div>
+                            <div style="margin-top:16px; color:#6a8aaa; font-size:14px;">
+                                Попробуйте открыть в новой вкладке: <span style="color:#6ab0ff;">${finalUrl}</span>
+                            </div>
+                            <button onclick="window.open('${finalUrl}', '_blank')" style="margin-top:16px; background:#2d4b70; border:none; color:white; padding:10px 28px; border-radius:30px; cursor:pointer; font-weight:500;">
+                                🔗 Открыть в новой вкладке
+                            </button>
+                        </div>
+                    `;
+                }
+
+                return `
+                    <iframe src="${finalUrl}" sandbox="allow-scripts allow-same-origin allow-forms allow-popups" loading="lazy"></iframe>
+                `;
+            }
+
+            // ----- ЗАПУСК ПРИЛОЖЕНИЙ -----
+            function launchApp(appName) {
+                if (state.isLocked) return;
+                closeStartMenu();
+
+                const existing = state.windows.find(w => w.app === appName && w.element.style.display !== 'none');
+                if (existing) {
+                    setActiveWindow(existing.id);
+                    existing.element.style.zIndex = 100 + state.windows.length;
+                    return;
+                }
+
+                let title, content, w = 420,
+                    h = 280;
+
+                switch (appName) {
+                    case 'notepad':
+                        title = '📝 Блокнот';
+                        content = `
+                            <p><strong>Заметки</strong></p>
+                            <textarea placeholder="Введите текст...">Привет, это Windows на JavaScript!</textarea>
+                            <p style="margin-top:10px; font-size:13px; opacity:0.7;">✏️ Текст сохраняется в сессии</p>
+                        `;
+                        break;
+                    case 'about':
+                        title = 'ℹ️ О системе';
+                        content = `
+                            <p><strong>Windows JS</strong> — веб-версия</p>
+                            <p>Версия: 3.0 (2026)</p>
+                            <p>Браузер с поддержкой реальных сайтов через iframe</p>
+                            <button onclick="alert('Добро пожаловать в Windows на JS!')">Подробнее</button>
+                        `;
+                        break;
+                    case 'explorer':
+                        title = '📁 Проводник';
+                        content = `
+                            <p>📂 <strong>Мои документы</strong></p>
+                            <p>📄 report.txt</p>
+                            <p>📄 notes.md</p>
+                            <p>🖼️ screenshot.png</p>
+                            <p>📁 Projects</p>
+                            <p>📁 Downloads</p>
+                            <p style="margin-top:16px; font-size:13px; opacity:0.6;">Эмуляция файлового менеджера</p>
+                        `;
+                        break;
+                    case 'terminal':
+                        title = '⌨️ Терминал';
+                        content = `
+                            <div style="background:#0b111e; padding:14px; border-radius:12px; font-family:monospace; color:#a0e0a0; font-size:14px;">
+                                > Windows JS Terminal v3.0<br>
+                                > Введите команду: <span style="color:#ffd966;">help</span><br>
+                                > Доступны: about, notepad, explorer, taskmgr, mycomputer, regedit, browser, lock, time, clear
+                            </div>
+                            <div style="display:flex; gap:8px; margin-top:12px;">
+                                <input id="termInput" style="flex:1; background:#1f2a3f; border:1px solid #3a5a7a; border-radius:30px; padding:8px 16px; color:white; outline:none;" placeholder="Введите команду..." />
+                                <button onclick="window.dispatchEvent(new CustomEvent('termCommand', {detail: document.getElementById('termInput').value}))" style="background:#2d4b70; border:none; color:white; padding:8px 20px; border-radius:30px; cursor:pointer;">⏎</button>
+                            </div>
+                            <div id="termOutput" style="margin-top:12px; font-family:monospace; font-size:13px; background:#0d1422; padding:10px 16px; border-radius:12px; min-height:32px; color:#b0d0ff;">Готов к работе.</div>
+                        `;
+                        w = 480;
+                        h = 380;
+                        break;
+                    case 'taskmgr':
+                        title = '📊 Диспетчер задач';
+                        const procs = generateProcesses();
+                        let tableRows = '';
+                        procs.forEach(p => {
+                            const cpuWidth = Math.min(p.cpu * 2, 80);
+                            tableRows += `
+                                <tr>
+                                    <td>${p.name}</td>
+                                    <td>${p.pid}</td>
+                                    <td><div class="cpu-bar" style="width:${cpuWidth}px; background:${p.cpu > 40 ? '#c42b3a' : '#3e6a9e'}"></div> ${p.cpu}%</td>
+                                    <td>${p.memory} MB</td>
+                                </tr>
+                            `;
+                        });
+                        content = `
+                            <p><strong>Процессы (${procs.length})</strong></p>
+                            <table class="taskmgr-table">
+                                <thead><tr><th>Имя</th><th>PID</th><th>ЦП</th><th>Память</th></tr></thead>
+                                <tbody>${tableRows}</tbody>
+                            </table>
+                            <p style="margin-top:12px; font-size:13px; opacity:0.6;">🔄 Данные обновлены (${new Date().toLocaleTimeString()})</p>
+                            <button onclick="launchApp('taskmgr')" style="margin-top:8px;">⟳ Обновить</button>
+                        `;
+                        w = 520;
+                        h = 380;
+                        break;
+                    case 'mycomputer':
+                        title = '🖥️ Мой компьютер';
+                        content = createMyComputerContent();
+                        w = 560;
+                        h = 520;
+                        break;
+                    case 'regedit':
+                        title = '📋 Редактор реестра';
+                        const regData = `
+                            <div class="reg-tree">
+                                <div>📁 <span class="folder">HKEY_LOCAL_MACHINE</span></div>
+                                <div class="indent">📁 <span class="folder">SOFTWARE</span></div>
+                                <div class="indent" style="padding-left:48px;">📁 <span class="folder">Microsoft</span></div>
+                                <div class="indent" style="padding-left:72px;">📁 <span class="folder">Windows</span></div>
+                                <div class="indent" style="padding-left:96px;">🔑 <span class="key">CurrentVersion</span> = <span class="value">"3.0.2026"</span></div>
+                                <div class="indent" style="padding-left:96px;">🔑 <span class="key">ProductName</span> = <span class="value">"Windows JS"</span></div>
+                                <div class="indent" style="padding-left:72px;">📁 <span class="folder">System</span></div>
+                                <div class="indent" style="padding-left:96px;">🔑 <span class="key">BootTime</span> = <span class="value">"${new Date().toLocaleString()}"</span></div>
+                                <div class="indent" style="padding-left:48px;">📁 <span class="folder">Users</span></div>
+                                <div class="indent" style="padding-left:72px;">📁 <span class="folder">Default</span></div>
+                                <div class="indent" style="padding-left:96px;">🔑 <span class="key">Desktop</span> = <span class="value">"C:\\\\Users\\\\Default\\\\Desktop"</span></div>
+                                <div style="margin-top:8px;">📁 <span class="folder">HKEY_CURRENT_USER</span></div>
+                                <div class="indent">📁 <span class="folder">Software</span></div>
+                                <div class="indent" style="padding-left:48px;">📁 <span class="folder">Microsoft</span></div>
+                                <div class="indent" style="padding-left:72px;">🔑 <span class="key">Theme</span> = <span class="value">"Dark"</span></div>
+                                <div class="indent" style="padding-left:72px;">🔑 <span class="key">Language</span> = <span class="value">"ru-RU"</span></div>
+                            </div>
+                            <p style="margin-top:12px; font-size:13px; opacity:0.6;">📋 Реестр Windows JS (только для чтения)</p>
+                        `;
+                        content = regData;
+                        w = 500;
+                        h = 400;
+                        break;
+                    case 'browser':
+                        title = '🌐 Браузер';
+                        content = createBrowserContent();
+                        w = 800;
+                        h = 580;
+                        break;
+                    default:
+                        return;
+                }
+
+                const winData = createWindow(appName, title, content, w, h);
+
+                // Специфика для браузера
+                if (appName === 'browser') {
+                    setTimeout(() => {
+                        setupBrowserEvents(winData.id);
+                    }, 150);
+                }
+
+                // Специфика для "Моего компьютера"
+                if (appName === 'mycomputer') {
+                    setTimeout(() => {
+                        const scanBtn = document.getElementById('scanDriveBtn');
+                        const analyzeBtn = document.getElementById('analyzeBtn');
+                        const refreshBtn = document.getElementById('refreshDrivesBtn');
+                        const scanLog = document.getElementById('scanLog');
+                        const fileListEl = document.getElementById('fileList');
+                        const driveBar = document.getElementById('driveBarFill');
+                        const scanStatus = document.getElementById('scanStatus');
+                        const fileCountSpan = document.getElementById('fileCount');
+
+                        if (scanBtn) {
+                            scanBtn.addEventListener('click', function() {
+                                if (this.disabled) return;
+                                this.disabled = true;
+                                scanLog.style.display = 'block';
+                                scanLog.innerHTML = '<div style="color:#ffd966;">▶ Запуск сканирования диска C:...</div>';
+
+                                driveBar.classList.add('scanning');
+                                scanStatus.innerHTML = '<span class="highlight">🔄</span> Сканирование... 0%';
+
+                                let progress = 0;
+                                let filesFound = 0;
+                                const totalFiles = 30 + Math.floor(Math.random() * 40);
+
+                                const interval = setInterval(() => {
+                                    progress += 1 + Math.floor(Math.random() * 4);
+                                    filesFound += Math.floor(Math.random() * 3);
+
+                                    if (progress >= 100) {
+                                        progress = 100;
+                                        clearInterval(interval);
+
+                                        driveBar.classList.remove('scanning');
+                                        driveBar.style.width = '100%';
+                                        driveBar.textContent = '100%';
+
+                                        const finalFiles = totalFiles + Math.floor(Math.random() * 20);
+                                        fileCountSpan.textContent = finalFiles;
+
+                                        scanStatus.innerHTML =
+                                            `<span class="highlight">✅</span> Сканирование завершено! Найдено файлов: <span class="highlight">${finalFiles}</span>`;
+
+                                        scanLog.innerHTML +=
+                                            `<div style="color:#a8e6a8;">✅ Сканирование завершено. Найдено ${finalFiles} файлов.</div>`;
+                                        scanLog.innerHTML +=
+                                            `<div style="color:#8aaac0;">📊 Общий размер: ${(100 + Math.random() * 150).toFixed(1)} GB</div>`;
+                                        scanLog.innerHTML +=
+                                            `<div style="color:#8aaac0;">📁 Папок: ${Math.floor(finalFiles * 0.3 + Math.random() * 20)}</div>`;
+                                        scanLog.scrollTop = scanLog.scrollHeight;
+
+                                        if (fileListEl) {
+                                            fileListEl.style.display = 'block';
+                                            let newFileList = '';
+                                            const fileTypes2 = ['.txt', '.docx', '.pdf', '.jpg', '.png', '.mp3',
+                                                '.mp4', '.exe', '.zip', '.js', '.html', '.css', '.json', '.xml'
+                                            ];
+                                            const fileNames2 = ['report', 'document', 'photo', 'music', 'video',
+                                                'archive', 'setup', 'notes', 'project', 'backup', 'config',
+                                                'data', 'image', 'presentation', 'system', 'user', 'temp'
+                                            ];
+                                            for (let i = 0; i < Math.min(finalFiles, 30); i++) {
+                                                const name = fileNames2[Math.floor(Math.random() * fileNames2
+                                                .length)];
+                                                const ext = fileTypes2[Math.floor(Math.random() * fileTypes2
+                                                .length)];
+                                                const size = (Math.random() * 15 + 0.5).toFixed(1);
+                                                newFileList += `📄 ${name}${ext} (${size} MB)\n`;
+                                            }
+                                            if (finalFiles > 30) {
+                                                newFileList += `\n... и ещё ${finalFiles - 30} файлов`;
+                                            }
+                                            fileListEl.textContent = newFileList;
+                                        }
+
+                                        this.disabled = false;
+                                        return;
+                                    }
+
+                                    const pct = Math.min(progress, 100);
+                                    driveBar.style.width = pct + '%';
+                                    driveBar.textContent = pct + '%';
+                                    scanStatus.innerHTML =
+                                        `<span class="highlight">🔄</span> Сканирование... ${pct}% · Найдено файлов: ${filesFound}`;
+
+                                    if (pct % 15 < 3) {
+                                        scanLog.innerHTML +=
+                                            `<div style="color:#8aaac0;">📂 Сканирование папок... ${pct}% (найдено ${filesFound} файлов)</div>`;
+                                        scanLog.scrollTop = scanLog.scrollHeight;
+                                    }
+                                }, 120);
+                            });
+                        }
+
+                        if (analyzeBtn) {
+                            analyzeBtn.addEventListener('click', function() {
+                                if (scanLog) {
+                                    scanLog.style.display = 'block';
+                                    const sizes = [
+                                        'Документы: 45.2 GB',
+                                        'Изображения: 23.7 GB',
+                                        'Видео: 78.3 GB',
+                                        'Музыка: 12.5 GB',
+                                        'Приложения: 34.8 GB',
+                                        'Временные файлы: 8.2 GB'
+                                    ];
+                                    scanLog.innerHTML = '<div style="color:#ffd966;">📊 Анализ диска C:</div>';
+                                    sizes.forEach(s => {
+                                        scanLog.innerHTML += `<div style="color:#8aaac0;">• ${s}</div>`;
+                                    });
+                                    scanLog.innerHTML +=
+                                        `<div style="color:#a8e6a8; margin-top:6px;">✅ Анализ завершён</div>`;
+                                    scanLog.scrollTop = scanLog.scrollHeight;
+                                }
+                            });
+                        }
+
+                        if (refreshBtn) {
+                            refreshBtn.addEventListener('click', function() {
+                                const usedNew = 187 + Math.floor(Math.random() * 40);
+                                const totalNew = 512;
+                                const pctNew = Math.round((usedNew / totalNew) * 100);
+                                const freeNew = totalNew - usedNew;
+
+                                if (driveBar) {
+                                    driveBar.style.width = pctNew + '%';
+                                    driveBar.textContent = pctNew + '%';
+                                    driveBar.style.background = pctNew > 80 ? '#c42b3a' : '#3e8a5e';
+                                }
+
+                                const sizeSpan = document.querySelector('.drive-size');
+                                if (sizeSpan) {
+                                    sizeSpan.textContent = `${usedNew} GB / ${totalNew} GB`;
+                                }
+
+                                const details = document.querySelectorAll('.drive-details .value');
+                                if (details.length >= 2) {
+                                    details[0].textContent = `${usedNew} GB`;
+                                    details[1].textContent = `${freeNew} GB`;
+                                }
+
+                                if (scanStatus) {
+                                    scanStatus.innerHTML =
+                                        `<span class="highlight">🟢</span> Готово · Файлов: <span id="fileCount">${30 + Math.floor(Math.random() * 40)}</span>`;
+                                }
+
+                                if (scanLog) {
+                                    scanLog.innerHTML = `<div style="color:#8aaac0;">🔄 Данные обновлены (${new Date().toLocaleTimeString()})</div>`;
+                                    scanLog.style.display = 'block';
+                                }
+                            });
+                        }
+                    }, 100);
+                }
+
+                // Специфика для терминала
+                if (appName === 'terminal') {
+                    setTimeout(() => {
+                        const input = document.getElementById('termInput');
+                        const output = document.getElementById('termOutput');
+                        if (input && output) {
+                            window.addEventListener('termCommand', (e) => {
+                                const cmd = e.detail?.trim() || '';
+                                if (!cmd) return;
+                                let response = '';
+                                if (cmd === 'help') response =
+                                    '📋 Доступны: about, notepad, explorer, taskmgr, mycomputer, regedit, browser, lock, time, clear';
+                                else if (cmd === 'about') response = 'ℹ️ Windows JS v3.0 — веб-ОС';
+                                else if (cmd === 'notepad') response = '📝 Запустите Блокнот через Пуск';
+                                else if (cmd === 'explorer') response = '📁 Запустите Проводник через Пуск';
+                                else if (cmd === 'taskmgr') response = '📊 Запустите Диспетчер задач через Пуск';
+                                else if (cmd === 'mycomputer') response = '🖥️ Запустите Мой компьютер через Пуск';
+                                else if (cmd === 'regedit') response = '📋 Запустите Редактор реестра через Пуск';
+                                else if (cmd === 'browser') response = '🌐 Запустите Браузер через Пуск';
+                                else if (cmd === 'lock') {
+                                    response = '🔒 Блокировка системы...';
+                                    setTimeout(() => lockSystem(), 200);
+                                } else if (cmd === 'clear') { output.textContent = '';
+                                    return; } else if (cmd === 'time') response = `⏰ ${new Date().toLocaleString()}`;
+                                else response = `❌ Неизвестная команда: ${cmd}`;
+                                output.textContent = response;
+                            });
+                            input.addEventListener('keydown', (e) => {
+                                if (e.key === 'Enter') {
+                                    window.dispatchEvent(new CustomEvent('termCommand', { detail: input.value }));
+                                    input.value = '';
+                                }
+                            });
+                        }
+                    }, 50);
+                }
+                updateTaskbar();
+            }
+
+            // ----- НАСТРОЙКА СОБЫТИЙ БРАУЗЕРА -----
+            function setupBrowserEvents(windowId) {
+                const urlInput = document.getElementById('browserUrl');
+                const goBtn = document.getElementById('goBtn');
+                const backBtn = document.getElementById('backBtn');
+                const forwardBtn = document.getElementById('forwardBtn');
+                const refreshBtn = document.getElementById('refreshBtn');
+                const homeBtn = document.getElementById('homeBtn');
+                const newTabBtn = document.getElementById('newTabBtn');
+                const contentEl = document.getElementById('browserContent');
+                const statusEl = document.getElementById('browserStatus');
+
+                if (!urlInput) return;
+
+                function navigateTo(url) {
+                    if (!url || url.trim() === '') {
+                        url = 'about:blank';
+                    }
+                    let finalUrl = url.trim();
+
+                    // Если это не URL, добавляем https://
+                    if (!finalUrl.startsWith('http://') && !finalUrl.startsWith('https://') && !finalUrl.startsWith(
+                            'about:') && !finalUrl.startsWith('file://')) {
+                        finalUrl = 'https://' + finalUrl;
+                    }
+
+                    const activeTab = state.browserHistory.tabs.find(t => t.id === state.browserHistory.activeTabId);
+                    if (!activeTab) return;
+
+                    // Обновляем историю
+                    activeTab.history = activeTab.history.slice(0, activeTab.historyIndex + 1);
+                    activeTab.history.push(finalUrl);
+                    activeTab.historyIndex = activeTab.history.length - 1;
+                    activeTab.url = finalUrl;
+                    activeTab.isLoading = true;
+
+                    // Обновляем заголовок
+                    let title = finalUrl.replace(/^https?:\/\//, '').split('/')[0] || 'Новая вкладка';
+                    if (title.length > 25) title = title.substring(0, 25) + '...';
+                    activeTab.title = title || 'Новая вкладка';
+
+                    // Обновляем URL в строке
+                    urlInput.value = finalUrl;
+
+                    // Показываем загрузку
+                    if (statusEl) {
+                        statusEl.innerHTML = '<span class="loading-text">⏳ Загрузка...</span>';
+                    }
+
+                    // Обновляем вкладки
+                    updateBrowserTabs(windowId);
+
+                    // Загружаем iframe
+                    if (contentEl) {
+                        contentEl.innerHTML = renderIframe(finalUrl);
+                    }
+
+                    // Имитация завершения загрузки
+                    setTimeout(() => {
+                        activeTab.isLoading = false;
+                        if (statusEl) {
+                            statusEl.innerHTML = '<span class="success-text">✅ Загружено</span>';
+                        }
+                        // Обновляем заголовок окна
+                        const winData = state.windows.find(w => w.id === windowId);
+                        if (winData) {
+                            const titleEl = winData.element.querySelector('.window-title');
+                            if (titleEl) {
+                                titleEl.innerHTML = `🌐 ${activeTab.title}`;
+                            }
+                        }
+                        updateBrowserTabs(windowId);
+                    }, 600 + Math.random() * 400);
+                }
+
+                // Навигация
+                window.navigateTo = navigateTo;
+
+                if (goBtn) {
+                    goBtn.addEventListener('click', () => {
+                        navigateTo(urlInput.value);
+                    });
+                }
+
+                if (urlInput) {
+                    urlInput.addEventListener('keydown', (e) => {
+                        if (e.key === 'Enter') {
+                            e.preventDefault();
+                            navigateTo(urlInput.value);
+                        }
+                    });
+                }
+
+                if (backBtn) {
+                    backBtn.addEventListener('click', () => {
+                        const activeTab = state.browserHistory.tabs.find(t => t.id === state.browserHistory
+                        .activeTabId);
+                        if (activeTab && activeTab.historyIndex > 0) {
+                            activeTab.historyIndex--;
+                            const url = activeTab.history[activeTab.historyIndex];
+                            activeTab.url = url;
+                            urlInput.value = url;
+                            if (contentEl) {
+                                contentEl.innerHTML = renderIframe(url);
+                            }
+                            updateBrowserTabs(windowId);
+                        }
+                    });
+                }
+
+                if (forwardBtn) {
+                    forwardBtn.addEventListener('click', () => {
+                        const activeTab = state.browserHistory.tabs.find(t => t.id === state.browserHistory
+                        .activeTabId);
+                        if (activeTab && activeTab.historyIndex < activeTab.history.length - 1) {
+                            activeTab.historyIndex++;
+                            const url = activeTab.history[activeTab.historyIndex];
+                            activeTab.url = url;
+                            urlInput.value = url;
+                            if (contentEl) {
+                                contentEl.innerHTML = renderIframe(url);
+                            }
+                            updateBrowserTabs(windowId);
+                        }
+                    });
+                }
+
+                if (refreshBtn) {
+                    refreshBtn.addEventListener('click', () => {
+                        const activeTab = state.browserHistory.tabs.find(t => t.id === state.browserHistory
+                        .activeTabId);
+                        if (activeTab) {
+                            navigateTo(activeTab.url);
+                        }
+                    });
+                }
+
+                if (homeBtn) {
+                    homeBtn.addEventListener('click', () => {
+                        navigateTo('');
+                    });
+                }
+
+                if (newTabBtn) {
+                    newTabBtn.addEventListener('click', () => {
+                        const newTab = {
+                            id: state.browserHistory.nextTabId++,
+                            title: 'Новая вкладка',
+                            url: '',
+                            history: [''],
+                            historyIndex: 0,
+                            favicon: '🌐',
+                            isLoading: false,
+                        };
+                        state.browserHistory.tabs.push(newTab);
+                        state.browserHistory.activeTabId = newTab.id;
+                        updateBrowserTabs(windowId);
+                        // Обновляем контент
+                        if (contentEl) {
+                            contentEl.innerHTML = renderIframe('');
+                        }
+                        if (urlInput) {
+                            urlInput.value = '';
+                        }
+                        if (statusEl) {
+                            statusEl.textContent = 'Готово';
+                        }
+                    });
+                }
+
+                // Закрытие вкладок
+                document.querySelectorAll('.tab-close').forEach(el => {
+                    el.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        const tabId = parseInt(el.dataset.tabId);
+                        if (state.browserHistory.tabs.length <= 1) {
+                            // Не закрываем последнюю вкладку
+                            return;
+                        }
+                        const index = state.browserHistory.tabs.findIndex(t => t.id === tabId);
+                        if (index !== -1) {
+                            state.browserHistory.tabs.splice(index, 1);
+                            if (state.browserHistory.activeTabId === tabId) {
+                                state.browserHistory.activeTabId = state.browserHistory.tabs[Math.min(index,
+                                    state.browserHistory.tabs.length - 1)].id;
+                            }
+                            updateBrowserTabs(windowId);
+                            // Обновляем контент
+                            const activeTab = state.browserHistory.tabs.find(t => t.id === state.browserHistory
+                                .activeTabId);
+                            if (activeTab && contentEl) {
+                                contentEl.innerHTML = renderIframe(activeTab.url || '');
+                                if (urlInput) {
+                                    urlInput.value = activeTab.url || '';
+                                }
+                            }
+                        }
+                    });
+                });
+
+                // Переключение вкладок
+                document.querySelectorAll('.browser-tab').forEach(el => {
+                    el.addEventListener('click', (e) => {
+                        if (e.target.classList.contains('tab-close')) return;
+                        const tabId = parseInt(el.dataset.tabId);
+                        state.browserHistory.activeTabId = tabId;
+                        const activeTab = state.browserHistory.tabs.find(t => t.id === tabId);
+                        if (activeTab && contentEl) {
+                            contentEl.innerHTML = renderIframe(activeTab.url || '');
+                            if (urlInput) {
+                                urlInput.value = activeTab.url || '';
+                            }
+                            if (statusEl) {
+                                statusEl.textContent = 'Готово';
+                            }
+                        }
+                        updateBrowserTabs(windowId);
+                    });
+                });
+
+                // Обновляем статус
+                setInterval(() => {
+                    const timeEl = document.getElementById('browserTime');
+                    if (timeEl) {
+                        timeEl.textContent = new Date().toLocaleTimeString();
+                    }
+                }, 10000);
+            }
+
+            function updateBrowserTabs(windowId) {
+                const winData = state.windows.find(w => w.id === windowId);
+                if (!winData) return;
+
+                const tabsContainer = winData.element.querySelector('.browser-tabs');
+                if (!tabsContainer) return;
+
+                const newTabBtn = tabsContainer.querySelector('#newTabBtn');
+
+                let tabsHTML = '';
+                state.browserHistory.tabs.forEach(tab => {
+                    const isActive = tab.id === state.browserHistory.activeTabId;
+                    const loadingClass = tab.isLoading ? 'tab-loading' : '';
+                    tabsHTML += `
+                        <div class="browser-tab ${isActive ? 'active' : ''}" data-tab-id="${tab.id}">
+                            <span class="tab-favicon ${loadingClass}">${tab.isLoading ? '⟳' : (tab.favicon || '🌐')}</span>
+                            <span>${tab.title || 'Новая вкладка'}</span>
+                            <span class="tab-close" data-tab-id="${tab.id}">✕</span>
+                        </div>
+                    `;
+                });
+
+                tabsContainer.innerHTML = tabsHTML + (newTabBtn ? newTabBtn.outerHTML :
+                    '<button id="newTabBtn" style="background:rgba(255,255,255,0.05); border:1px solid #2a4060; color:#b0caf0; border-radius:8px; padding:2px 12px; cursor:pointer; font-size:16px;">+</button>'
+                    );
+
+                setTimeout(() => {
+                    setupBrowserEvents(windowId);
+                }, 50);
+            }
+
+            // ----- МЕНЮ ПУСК -----
+            function toggleStartMenu() {
+                if (state.isLocked) return;
+                state.startMenuOpen = !state.startMenuOpen;
+                startMenu.classList.toggle('visible', state.startMenuOpen);
+            }
+
+            function closeStartMenu() {
+                state.startMenuOpen = false;
+                startMenu.classList.remove('visible');
+            }
+
+            // ----- СОБЫТИЯ -----
+            startBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                toggleStartMenu();
+            });
+
+            document.querySelectorAll('.start-app-item[data-app]').forEach(el => {
+                el.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const app = el.dataset.app;
+                    if (app) launchApp(app);
+                });
+            });
+
+            document.getElementById('shutdown-item').addEventListener('click', () => {
+                if (confirm('Выключить систему?')) {
+                    document.body.innerHTML = `
+                        <div style="display:flex; height:100vh; justify-content:center; align-items:center; background:#0a0e18; color:#b8d4ff; flex-direction:column; gap:30px;">
+                            <span style="font-size:70px;">⏻</span>
+                            <h1 style="font-weight:300;">Система выключена</h1>
+                            <p style="opacity:0.6;">Нажмите F5 или перезагрузите страницу</p>
+                        </div>
+                    `;
+                }
+            });
+
+            document.querySelectorAll('.desktop-icon').forEach(icon => {
+                icon.addEventListener('dblclick', () => {
+                    const app = icon.dataset.app;
+                    if (app) launchApp(app);
+                });
+            });
+
+            document.addEventListener('click', (e) => {
+                if (!e.target.closest('#start-menu') && !e.target.closest('#start-btn')) {
+                    closeStartMenu();
+                }
+            });
+
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') closeStartMenu();
+                if (e.ctrlKey && e.key === 'l') {
+                    e.preventDefault();
+                    if (!state.isLocked && state.bootComplete) lockSystem();
+                }
+                if (state.isLocked) {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        checkPassword();
+                    }
+                    return;
+                }
+                if (e.altKey && e.key === 'n') { e.preventDefault();
+                    launchApp('notepad'); }
+                if (e.altKey && e.key === 'a') { e.preventDefault();
+                    launchApp('about'); }
+                if (e.altKey && e.key === 'e') { e.preventDefault();
+                    launchApp('explorer'); }
+                if (e.altKey && e.key === 't') { e.preventDefault();
+                    launchApp('terminal'); }
+                if (e.altKey && e.key === 'm') { e.preventDefault();
+                    launchApp('taskmgr'); }
+                if (e.altKey && e.key === 'c') { e.preventDefault();
+                    launchApp('mycomputer'); }
+                if (e.altKey && e.key === 'r') { e.preventDefault();
+                    launchApp('regedit'); }
+                if (e.altKey && e.key === 'b') { e.preventDefault();
+                    launchApp('browser'); }
+            });
+
+            document.addEventListener('dragstart', (e) => e.preventDefault());
+
+            // ----- ЭКСПОРТ -----
+            window.launchApp = launchApp;
+            window.lockSystem = lockSystem;
+            window.navigateTo = function(url) {
+                const browserWin = state.windows.find(w => w.app === 'browser');
+                if (browserWin) {
+                    const urlInput = document.getElementById('browserUrl');
+                    if (urlInput) {
+                        urlInput.value = url;
+                        const goBtn = document.getElementById('goBtn');
+                        if (goBtn) goBtn.click();
+                    }
+                }
+            };
+
+            // После завершения загрузки отмечаем, что система готова
+            setTimeout(() => {
+                const checkComplete = setInterval(() => {
+                    if (bootScreen.classList.contains('hidden')) {
+                        state.bootComplete = true;
+                        clearInterval(checkComplete);
+                    }
+                }, 100);
+            }, 100);
+
+        })();
+    </script>
+
+</body>
+</html>
